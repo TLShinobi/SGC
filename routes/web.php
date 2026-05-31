@@ -55,6 +55,3 @@ Route::middleware('auth')->group(function () {
         Route::delete('/registro/{registro}', [RegistroPatrimonialController::class, 'destroy'])->name('registros.destroy');
     });
 });
-
-
-este texto rompera el codigo

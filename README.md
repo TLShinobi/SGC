@@ -174,4 +174,6 @@ gantt
 ```
 
 ---
-> Proyecto académico desarrollado para la materia Implantación de Sistemas (2026). Equipo: Eduardo Rojas & Ernesto Polanco.
+Integrantes: 
+Br. Eduardo Rojas
+Br. Ernesto Polanco

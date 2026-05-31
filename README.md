@@ -11,28 +11,26 @@ El proyecto garantiza la **Paridad de Entornos**, utiliza **Arquitectura Monolí
 A continuación, se renderiza nativamente toda la ingeniería de software aplicada en el sistema.
 
 ### 1. Diagrama de Arquitectura de Despliegue
-Implementación Monolítica escalable, eliminando dependencias de microservicios externos y utilizando el servidor nativo de persistencia de archivos de Laravel.
 
 ```mermaid
 flowchart TD
-    Cliente[Navegador del Investigador / Admin]
+    Cliente["Navegador del Historiador"]
     
-    subgraph Cloud_Server [Servidor Monolítico en la Nube]
-        Laravel[Aplicación Laravel 10<br>Frontend Blade + API Backend]
-        PostgreSQL[(Base de Datos SQL)]
-        LocalVol[Volumen de Storage Local<br>Archivos Físicos]
+    subgraph Servidor_Nube ["Servidor Monolítico en la Nube"]
+        Laravel["Aplicación Laravel (Backend + Frontend)"]
+        PostgreSQL[("Base de Datos SQL")]
+        LocalVol["Disco Local (Archivos Físicos)"]
     end
     
-    Cliente -- "Tráfico Web Segura HTTPS" --> Laravel
-    Laravel -- "Render HTML + CSS Compilado" --> Cliente
-    Laravel -- "Consultas Eloquent ORM" --> PostgreSQL
-    Laravel -- "Flysystem I/O" --> LocalVol
+    Cliente -->|"Tráfico HTTPS"| Laravel
+    Laravel -->|"Vistas HTML / CSS"| Cliente
+    Laravel -->|"Consultas ORM"| PostgreSQL
+    Laravel -->|"Lectura / Escritura"| LocalVol
 ```
 
 ---
 
 ### 2. Diagrama Entidad-Relación (ER)
-Arquitectura de datos que soporta trazabilidad de usuarios y múltiples archivos adjuntos por suceso histórico.
 
 ```mermaid
 erDiagram
@@ -41,14 +39,14 @@ erDiagram
     REGISTROS_PATRIMONIALES ||--o{ ARCHIVOS : "posee (1:N)"
     USERS ||--o{ COMENTARIOS : "escribe"
     REGISTROS_PATRIMONIALES ||--o{ COMENTARIOS : "recibe"
-    USERS }|--|{ REGISTROS_PATRIMONIALES : "guarda en marcadores"
+    USERS }|--|{ REGISTROS_PATRIMONIALES : "guarda_marcador"
 
     USERS {
         BIGINT id PK
         VARCHAR name
         VARCHAR email
         VARCHAR password
-        VARCHAR role "administrador, publicador, usuario"
+        VARCHAR role
     }
     
     CATEGORIAS {
@@ -80,38 +78,37 @@ erDiagram
 ---
 
 ### 3. Diagrama de Secuencia (Ingreso de Acta Patrimonial con Manejo de Errores)
-Flujo detallado demostrando el tratamiento de excepciones (bloques `alt` / `else`) durante operaciones críticas de disco.
 
 ```mermaid
 sequenceDiagram
     actor Admin as Administrador
-    participant GUI as Interfaz Web (Blade)
-    participant Ctrl as RegistroPatrimonialController
-    participant Disk as Almacenamiento Local
+    participant GUI as Interfaz Web
+    participant Ctrl as Controlador
+    participant Disk as Almacenamiento
     participant DB as Motor SQL
 
-    Admin->>GUI: Llena formulario y adjunta archivo PDF
-    GUI->>Ctrl: POST /ingesta (Datos + Archivo)
-    Ctrl->>Ctrl: Validación de datos (Request)
+    Admin->>GUI: Sube formulario y PDF
+    GUI->>Ctrl: POST /ingesta
+    Ctrl->>Ctrl: Validación de request
     
-    alt Datos inválidos o archivo pesado
-        Ctrl-->>GUI: Redirigir con errores (HTTP 302)
-        GUI-->>Admin: Muestra mensaje de alerta
+    alt Datos inválidos
+        Ctrl-->>GUI: Redirigir con errores
+        GUI-->>Admin: Muestra alertas rojas
     else Datos válidos
-        Ctrl->>Disk: store('patrimonio', 'public')
+        Ctrl->>Disk: Guardar archivo fisico
         
-        alt Fallo de almacenamiento físico (Exception)
-            Disk-->>Ctrl: Lanza Excepción
-            Ctrl-->>GUI: Retorna Error 500 "Falla al guardar"
-            GUI-->>Admin: Muestra pantalla de error del sistema
+        alt Falla de disco
+            Disk-->>Ctrl: Exception / Error
+            Ctrl-->>GUI: Retorna Error 500
+            GUI-->>Admin: Muestra error del sistema
         else Almacenamiento exitoso
-            Disk-->>Ctrl: Retorna $path de archivo seguro
-            Ctrl->>DB: Insertar Registro Patrimonial
-            DB-->>Ctrl: Retorna modelo con UUID
-            Ctrl->>DB: Insertar relación en tabla Archivos
+            Disk-->>Ctrl: Retorna ruta del archivo
+            Ctrl->>DB: Insertar Registro
+            DB-->>Ctrl: OK UUID
+            Ctrl->>DB: Insertar relación Archivo
             DB-->>Ctrl: OK
-            Ctrl-->>GUI: Redirigir a Catálogo con Éxito
-            GUI-->>Admin: "Documento preservado correctamente"
+            Ctrl-->>GUI: Redirigir a Catálogo
+            GUI-->>Admin: Mensaje de Exito
         end
     end
 ```
@@ -119,23 +116,22 @@ sequenceDiagram
 ---
 
 ### 4. Casos de Uso del Sistema
-Sistema basado en permisos dinámicos y roles jerárquicos.
 
 ```mermaid
 flowchart LR
-    Guest(["Visitante (Anónimo)"])
+    Guest(["Visitante Anónimo"])
     User(["Usuario Registrado"])
-    Pub(["Publicador"])
+    Pub(["Publicador / Archivista"])
     Admin(["Administrador"])
 
-    subgraph "Sistema Gestor de Contenido"
-        UC1("Consultar Catálogo de Registros")
-        UC2("Visualizar Efemérides en Portal")
+    subgraph SGC ["Sistema Gestor de Contenido"]
+        UC1("Consultar Catálogo Público")
+        UC2("Ver Efemérides Históricas")
         UC3("Iniciar Sesión")
-        UC4("Dejar Comentarios en Registros")
-        UC5("Añadir/Quitar Marcadores")
-        UC6("Ingresar Nuevos Registros Históricos")
-        UC7("Archivar/Eliminar Registros Históricos")
+        UC4("Comentar Registros")
+        UC5("Gestionar Favoritos")
+        UC6("Subir Nuevos Documentos")
+        UC7("Archivar Documentos (Soft Delete)")
         UC8("Moderar Comentarios")
     end
 
@@ -160,22 +156,22 @@ flowchart LR
 ---
 
 ### 5. Plan de Acción y Ejecución Temporal
-Visualización de los ciclos de desarrollo iterativo (Sprints).
 
 ```mermaid
 gantt
     title Cronograma SGC (12 Semanas)
     dateFormat  YYYY-MM-DD
-    section Fase 1: Análisis y Base
+    section Analisis
     Levantamiento de Info y Arquitectura :a1, 2026-03-01, 14d
     Wireframes e Identidad Visual        :a2, after a1, 7d
-    section Fase 2: Core Funcional
+    section Desarrollo
     Migraciones y Roles Autenticados     :b1, 2026-03-22, 10d
-    Lógica de Archivos y CRUD            :b2, after b1, 14d
+    Logica de Archivos y CRUD            :b2, after b1, 14d
     Portal Frontend y Buscador           :b3, after b2, 7d
-    section Fase 3: Módulos Avanzados
-    Discusión (Comentarios) y Favoritos  :c1, 2026-04-22, 10d
-    Setup CI/CD y Documentación Final    :c2, after c1, 7d
+    section Cierre
+    Discusion y Favoritos                :c1, 2026-04-22, 10d
+    Setup CI/CD y Documentacion          :c2, after c1, 7d
 ```
 
 ---
+> Proyecto académico desarrollado para la materia Implantación de Sistemas (2026). Equipo: Eduardo Rojas & Ernesto Polanco.
